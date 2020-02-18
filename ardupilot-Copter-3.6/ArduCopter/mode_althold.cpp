@@ -33,12 +33,14 @@ void Copter::ModeAltHold::run()
 
     // get pilot desired lean angles
     float target_roll, target_pitch;
+    //操纵输入转化为姿态角
     get_pilot_desired_lean_angles(target_roll, target_pitch, copter.aparm.angle_max, attitude_control->get_althold_lean_angle_max());
 
     // get pilot's desired yaw rate
+    //航向操纵转化为角速率，并且指数平滑
     float target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
-    // get pilot desired climb rate
+    // get pilot desired climb rate考虑死区
     float target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
     target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
 
@@ -56,12 +58,12 @@ void Copter::ModeAltHold::run()
     // Alt Hold State Machine
     switch (althold_state) {
 
-    case AltHold_MotorStopped:
+    case AltHold_MotorStopped:  //上锁
 
         motors->set_desired_spool_state(AP_Motors::DESIRED_SHUT_DOWN);
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
         attitude_control->reset_rate_controller_I_terms();
-        attitude_control->set_yaw_target_to_current_heading();
+        attitude_control->set_yaw_target_to_current_heading();  //目标姿态四元数旋转航向
 #if FRAME_CONFIG == HELI_FRAME    
         // force descent rate and call position controller
         pos_control->set_alt_target_from_climb_rate(-abs(g.land_speed), G_Dt, false);
@@ -75,7 +77,7 @@ void Copter::ModeAltHold::run()
         pos_control->update_z_controller();
         break;
 
-    case AltHold_Takeoff:
+    case AltHold_Takeoff:  //起飞
 #if FRAME_CONFIG == HELI_FRAME    
         if (heli_flags.init_targets_on_arming) {
             heli_flags.init_targets_on_arming=false;
@@ -108,7 +110,7 @@ void Copter::ModeAltHold::run()
         pos_control->update_z_controller();
         break;
 
-    case AltHold_Landed:
+    case AltHold_Landed: //降落在地面
         // set motors to spin-when-armed if throttle below deadzone, otherwise full range (but motors will only spin at min throttle)
         if (target_climb_rate < 0.0f) {
             motors->set_desired_spool_state(AP_Motors::DESIRED_SPIN_WHEN_ARMED);
@@ -133,7 +135,7 @@ void Copter::ModeAltHold::run()
         pos_control->update_z_controller();
         break;
 
-    case AltHold_Flying:
+    case AltHold_Flying://飞行状态
         motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
 #if AC_AVOID_ENABLED == ENABLED
@@ -144,7 +146,7 @@ void Copter::ModeAltHold::run()
         // call attitude controller
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
 
-        // adjust climb rate using rangefinder
+        // adjust climb rate using rangefinder测距仪
         target_climb_rate = get_surface_tracking_climb_rate(target_climb_rate, pos_control->get_alt_target(), G_Dt);
 
         // get avoidance adjusted climb rate

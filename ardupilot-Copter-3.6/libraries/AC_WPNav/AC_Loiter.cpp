@@ -116,9 +116,9 @@ void AC_Loiter::init_target()
     const Vector3f& curr_pos = _inav.get_position();
     const Vector3f& curr_vel = _inav.get_velocity();
 
-    sanity_check_params();
+    sanity_check_params(); //检测最大加速度和最大速度是否在范围内
 
-    // initialise pos controller speed and acceleration
+    // initialise pos controller speed and acceleration速度，加速度和位置范围
     _pos_control.set_speed_xy(LOITER_VEL_CORRECTION_MAX);
     _pos_control.set_accel_xy(_accel_cmss);
     _pos_control.set_leash_length_xy(LOITER_POS_CORRECTION_MAX);
@@ -126,6 +126,7 @@ void AC_Loiter::init_target()
     _predicted_accel = _desired_accel;
     // update angle targets that will be passed to stabilize controller
     float roll_cd, pitch_cd;
+    //通过预测加速度计算目标姿态角
     _pos_control.accel_to_lean_angles(_predicted_accel.x, _predicted_accel.y, roll_cd, pitch_cd);
     _predicted_euler_angle.x = radians(roll_cd*0.01);
     _predicted_euler_angle.y = radians(pitch_cd*0.01);
@@ -164,9 +165,9 @@ void AC_Loiter::set_pilot_desired_acceleration(float euler_roll_angle_cd, float 
     // convert our desired attitude to an acceleration vector assuming we are hovering
     const float pilot_cos_pitch_target = constrain_float(cosf(euler_pitch_angle), 0.5f, 1.0f);
     const float pilot_accel_rgt_cms = GRAVITY_MSS*100.0f * tanf(euler_roll_angle)/pilot_cos_pitch_target;
-    const float pilot_accel_fwd_cms = -GRAVITY_MSS*100.0f * tanf(euler_pitch_angle);
+    const float pilot_accel_fwd_cms = -GRAVITY_MSS*100.0f * tanf(euler_pitch_angle); //操纵计算出的加速度
 
-    // rotate acceleration vectors input to lat/lon frame北东地期望加速度
+    // rotate acceleration vectors input to lat/lon frame经纬坐标系期望加速度，用作加速度前馈
     _desired_accel.x = (pilot_accel_fwd_cms*_ahrs.cos_yaw() - pilot_accel_rgt_cms*_ahrs.sin_yaw());
     _desired_accel.y = (pilot_accel_fwd_cms*_ahrs.sin_yaw() + pilot_accel_rgt_cms*_ahrs.cos_yaw());
 
@@ -174,7 +175,7 @@ void AC_Loiter::set_pilot_desired_acceleration(float euler_roll_angle_cd, float 
     Vector2f angle_error(wrap_PI(euler_roll_angle - _predicted_euler_angle.x), wrap_PI(euler_pitch_angle - _predicted_euler_angle.y));
 
     // calculate the angular velocity that we would expect given our desired and predicted attitude
-    _attitude_control.input_shaping_rate_predictor(angle_error, _predicted_euler_rate, dt);
+    _attitude_control.input_shaping_rate_predictor(angle_error, _predicted_euler_rate, dt);//更新通过平滑后的期望角速度
 
     // update our predicted attitude based on our predicted angular velocity
     _predicted_euler_angle += _predicted_euler_rate * dt;
@@ -182,9 +183,10 @@ void AC_Loiter::set_pilot_desired_acceleration(float euler_roll_angle_cd, float 
     // convert our predicted attitude to an acceleration vector assuming we are hovering
     const float pilot_predicted_cos_pitch_target = cosf(_predicted_euler_angle.y);
     const float pilot_predicted_accel_rgt_cms = GRAVITY_MSS*100.0f * tanf(_predicted_euler_angle.x)/pilot_predicted_cos_pitch_target;
-    const float pilot_predicted_accel_fwd_cms = -GRAVITY_MSS*100.0f * tanf(_predicted_euler_angle.y);
+    const float pilot_predicted_accel_fwd_cms = -GRAVITY_MSS*100.0f * tanf(_predicted_euler_angle.y);//平滑后期望加速度
 
-    // rotate acceleration vectors input to lat/lon frame地轴系预测加速度
+    // rotate acceleration vectors input to lat/lon frame经纬坐标系预测加速度，用于更新期望速度
+    //经纬坐标系与与体轴系相差航向角
     _predicted_accel.x = (pilot_predicted_accel_fwd_cms*_ahrs.cos_yaw() - pilot_predicted_accel_rgt_cms*_ahrs.sin_yaw());
     _predicted_accel.y = (pilot_predicted_accel_fwd_cms*_ahrs.sin_yaw() + pilot_predicted_accel_rgt_cms*_ahrs.cos_yaw());
 }
@@ -217,7 +219,7 @@ void AC_Loiter::update(float ekfGndSpdLimit, float ekfNavVelGainScaler)
     _pos_control.set_speed_xy(_speed_cms);
     _pos_control.set_accel_xy(_accel_cmss);
 
-    calc_desired_velocity(dt,ekfGndSpdLimit);
+    calc_desired_velocity(dt,ekfGndSpdLimit); //添加拉拽速度和刹车速度
     _pos_control.update_xy_controller(ekfNavVelGainScaler);
 }
 
@@ -280,6 +282,7 @@ void AC_Loiter::calc_desired_velocity(float nav_dt, float ekfGndSpdLimit)
             loiter_brake_accel = 0.0f;
             _brake_timer = AP_HAL::millis();
         }
+        //刹车加速度变化限幅
         _brake_accel += constrain_float(loiter_brake_accel-_brake_accel, -_brake_jerk_max_cmsss*nav_dt, _brake_jerk_max_cmsss*nav_dt);
         loiter_accel_brake = desired_vel_norm*_brake_accel;
 

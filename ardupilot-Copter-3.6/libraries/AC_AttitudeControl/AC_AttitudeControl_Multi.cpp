@@ -195,11 +195,11 @@ void AC_AttitudeControl_Multi::update_althold_lean_angle_max(float throttle_in)
 void AC_AttitudeControl_Multi::set_throttle_out(float throttle_in, bool apply_angle_boost, float filter_cutoff)
 {
     _throttle_in = throttle_in;
-    update_althold_lean_angle_max(throttle_in);
+    update_althold_lean_angle_max(throttle_in);  //每一步都计算一次，油门越接近最大值，角度越小
     _motors.set_throttle_filter_cutoff(filter_cutoff);
     if (apply_angle_boost) {
         // Apply angle boost
-        throttle_in = get_throttle_boosted(throttle_in);
+        throttle_in = get_throttle_boosted(throttle_in);  //姿态角在[60°-90°]是做补偿
     }else{
         // Clear angle_boost for logging purposes
         _angle_boost = 0.0f;
@@ -219,7 +219,7 @@ float AC_AttitudeControl_Multi::get_throttle_boosted(float throttle_in)
     // inverted_factor is 1 for tilt angles below 60 degrees
     // inverted_factor reduces from 1 to 0 for tilt angles between 60 and 90 degrees
 
-    float cos_tilt = _ahrs.cos_pitch() * _ahrs.cos_roll();
+    float cos_tilt = _ahrs.cos_pitch() * _ahrs.cos_roll();//机体Z轴与地轴Z轴的夹角余弦
     float inverted_factor = constrain_float(2.0f*cos_tilt, 0.0f, 1.0f);
     float boost_factor = 1.0f/constrain_float(cos_tilt, 0.5f, 1.0f);
 

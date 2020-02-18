@@ -340,8 +340,8 @@ void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, floa
 
     float accel_z_max = MIN(accel_z_cms, safe_sqrt(2.0f*fabsf(_vel_desired.z - climb_rate_cms)*jerk_z));
 
-    _accel_last_z_cms += jerk_z * dt;
-    _accel_last_z_cms = MIN(accel_z_max, _accel_last_z_cms);
+    _accel_last_z_cms += jerk_z * dt;//如果有改变就缓慢变化
+    _accel_last_z_cms = MIN(accel_z_max, _accel_last_z_cms);  //限幅
 
     float vel_change_limit = _accel_last_z_cms * dt;
     _vel_desired.z = constrain_float(climb_rate_cms, _vel_desired.z-vel_change_limit, _vel_desired.z+vel_change_limit);
@@ -478,7 +478,7 @@ void AC_PosControl::update_z_controller()
     _last_update_z_us = now_us;
 
     // check for ekf altitude reset
-    check_for_ekf_z_reset();
+    check_for_ekf_z_reset();  //跟位置一样，只有EKF2和EKF3有补偿，
 
     // check if leash lengths need to be recalculated
     calc_leash_length_z();
@@ -545,7 +545,7 @@ void AC_PosControl::run_z_controller()
     if (_flags.use_desvel_ff_z) {
         _vel_target.z += _vel_desired.z;
     }
-
+//目标速度到目标加速度
     // the following section calculates acceleration required to achieve the velocity target
 
     const Vector3f& curr_vel = _inav.get_velocity();
@@ -559,7 +559,7 @@ void AC_PosControl::run_z_controller()
     // feed forward desired acceleration calculation
     if (_dt > 0.0f) {
     	if (!_flags.freeze_ff_z) {
-    	    _accel_desired.z = (_vel_target.z - _vel_last.z)/_dt;
+    	    _accel_desired.z = (_vel_target.z - _vel_last.z)/_dt;  //用于前馈
         } else {
     		// stop the feed forward being calculated during a known discontinuity
     		_flags.freeze_ff_z = false;
@@ -582,17 +582,17 @@ void AC_PosControl::run_z_controller()
         _vel_error.z = _vel_error_filter.apply(_vel_target.z - curr_vel.z, _dt);
     }
 
-    _accel_target.z = _p_vel_z.get_p(_vel_error.z);
+    _accel_target.z = _p_vel_z.get_p(_vel_error.z);  //只用了P
 
-    _accel_target.z += _accel_desired.z;
+    _accel_target.z += _accel_desired.z;  //加前馈项
 
-
+//加速度到油门
     // the following section calculates a desired throttle needed to achieve the acceleration target
     float z_accel_meas;         // actual acceleration
     float p,i,d;              // used to capture pid values for logging
 
     // Calculate Earth Frame Z acceleration
-    z_accel_meas = -(_ahrs.get_accel_ef_blended().z + GRAVITY_MSS) * 100.0f;
+    z_accel_meas = -(_ahrs.get_accel_ef_blended().z + GRAVITY_MSS) * 100.0f;  //反馈加速度
 
     // reset target altitude if this controller has just been engaged
     if (_flags.reset_accel_to_throttle) {
@@ -609,10 +609,10 @@ void AC_PosControl::run_z_controller()
     _pid_accel_z.set_desired_rate(_accel_target.z);
 
     // separately calculate p, i, d values for logging
-    p = _pid_accel_z.get_p();
+    p = _pid_accel_z.get_p();  //一维PID
 
     // get i term
-    i = _pid_accel_z.get_integrator();
+    i = _pid_accel_z.get_integrator();  //这里只是读取上一次的I
 
     // ensure imax is always large enough to overpower hover throttle
     if (_motors.get_throttle_hover() * 1000.0f > _pid_accel_z.imax()) {
@@ -622,7 +622,7 @@ void AC_PosControl::run_z_controller()
     // update i term as long as we haven't breached the limits or the I term will certainly reduce
     // To-Do: should this be replaced with limits check from attitude_controller?
     if ((!_motors.limit.throttle_lower && !_motors.limit.throttle_upper) || (i>0&&_accel_error.z<0) || (i<0&&_accel_error.z>0)) {
-        i = _pid_accel_z.get_i();
+        i = _pid_accel_z.get_i();//积分处理在这里
     }
 
     // get d term
@@ -631,7 +631,7 @@ void AC_PosControl::run_z_controller()
     float thr_out = (p+i+d)*0.001f +_motors.get_throttle_hover();
 
     // send throttle to attitude controller with angle boost
-    _attitude_control.set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+    _attitude_control.set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ); //默认截止频率是2HZ
 }
 
 ///
@@ -809,7 +809,7 @@ void AC_PosControl::update_xy_controller(float ekfNavVelGainScaler)
     }
 
     // check for ekf xy position reset
-    check_for_ekf_xy_reset();
+    check_for_ekf_xy_reset();  //只有EKF2和EKF3才有有位置补偿值，是位置估算的时候添加的补偿。
 
     // check if xy leash needs to be recalculated
     calc_leash_length_xy();
@@ -1014,7 +1014,7 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
         // Constrain _pos_error and target position
         // Constrain the maximum length of _vel_target to the maximum position correction velocity
         // TODO: replace the leash length with a user definable maximum position correction
-        if (limit_vector_length(_pos_error.x, _pos_error.y, _leash))
+        if (limit_vector_length(_pos_error.x, _pos_error.y, _leash))//超出位置范围，重置目标位置，使其与误差保持一致
         {
             _pos_target.x = curr_pos.x + _pos_error.x;
             _pos_target.y = curr_pos.y + _pos_error.y;
@@ -1046,22 +1046,22 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
     // TODO: constrain velocity error and velocity target
 
     // call pi controller
-    _pid_vel_xy.set_input(_vel_error);
+    _pid_vel_xy.set_input(_vel_error);  //误差滤波和求微分
 
     // get p
-    vel_xy_p = _pid_vel_xy.get_p();
+    vel_xy_p = _pid_vel_xy.get_p();  //获得比例项
 
     // update i term if we have not hit the accel or throttle limits OR the i term will reduce
     // TODO: move limit handling into the PI and PID controller
-    if (!_limit.accel_xy && !_motors.limit.throttle_upper) {
+    if (!_limit.accel_xy && !_motors.limit.throttle_upper) {//加速度未到极限，油门未到极限
         vel_xy_i = _pid_vel_xy.get_i();
     } else {
-        vel_xy_i = _pid_vel_xy.get_i_shrink();
+        vel_xy_i = _pid_vel_xy.get_i_shrink(); //抗积分饱和处理
     }
 
     // get d
     vel_xy_d = _pid_vel_xy.get_d();
-
+     //获得目标加速度
     // acceleration to correct for velocity error and scale PID output to compensate for optical flow measurement induced EKF noise
     accel_target.x = (vel_xy_p.x + vel_xy_i.x + vel_xy_d.x) * ekfNavVelGainScaler;
     accel_target.y = (vel_xy_p.y + vel_xy_i.y + vel_xy_d.y) * ekfNavVelGainScaler;
@@ -1073,6 +1073,7 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
      }
 
     // filter correction acceleration
+     //设置截止频率，通过截止频率和采样频率计算滤波系数alpha
     _accel_target_filter.set_cutoff_frequency(MIN(_accel_xy_filt_hz, 5.0f*ekfNavVelGainScaler));
     _accel_target_filter.apply(accel_target, dt);
 
@@ -1080,7 +1081,7 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
     _accel_target.x = _accel_target_filter.get().x;
     _accel_target.y = _accel_target_filter.get().y;
 
-    // Add feed forward into the target acceleration output
+    // Add feed forward into the target acceleration output添加前馈
     _accel_target.x += _accel_desired.x;
     _accel_target.y += _accel_desired.y;
 
@@ -1100,7 +1101,7 @@ void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss,
 {
     float accel_right, accel_forward;
 
-    // rotate accelerations into body forward-right frame第轴系到体轴系转换
+    // rotate accelerations into body forward-right frame地轴系到体轴系转换，其实只是方向转了，姿态角没有转
     // todo: this should probably be based on the desired heading not the current heading
     accel_forward = accel_x_cmss*_ahrs.cos_yaw() + accel_y_cmss*_ahrs.sin_yaw();
     accel_right = -accel_x_cmss*_ahrs.sin_yaw() + accel_y_cmss*_ahrs.cos_yaw();

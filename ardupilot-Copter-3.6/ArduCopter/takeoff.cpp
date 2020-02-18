@@ -50,7 +50,7 @@ bool Copter::Mode::do_user_takeoff(float takeoff_alt_cm, bool must_navigate)
 // start takeoff to specified altitude above home in centimeters
 void Copter::Mode::_TakeOff::start(float alt_cm)
 {
-    // calculate climb rate
+    // calculate climb rate爬升速度
     const float speed = MIN(copter.wp_nav->get_speed_up(), MAX(copter.g.pilot_speed_up*2.0f/3.0f, copter.g.pilot_speed_up-50.0f));
 
     // sanity check speed and target
@@ -86,16 +86,16 @@ void Copter::Mode::_TakeOff::get_climb_rates(float& pilot_climb_rate,
     }
 
     // acceleration of 50cm/s/s
-    static constexpr float TAKEOFF_ACCEL = 50.0f;
-    const float takeoff_minspeed = MIN(50.0f, max_speed);
+    static constexpr float TAKEOFF_ACCEL = 50.0f; //加速度
+    const float takeoff_minspeed = MIN(50.0f, max_speed); //初始速度
     const float time_elapsed = (millis() - start_ms) * 1.0e-3f;
-    const float speed = MIN(time_elapsed * TAKEOFF_ACCEL + takeoff_minspeed, max_speed);
+    const float speed = MIN(time_elapsed * TAKEOFF_ACCEL + takeoff_minspeed, max_speed);//加速过程
 
     const float time_to_max_speed = (max_speed - takeoff_minspeed) / TAKEOFF_ACCEL;
     float height_gained;
-    if (time_elapsed <= time_to_max_speed) {
+    if (time_elapsed <= time_to_max_speed) {//还未到达最大速度，是一个匀加速过程
         height_gained = 0.5f * TAKEOFF_ACCEL * sq(time_elapsed) + takeoff_minspeed * time_elapsed;
-    } else {
+    } else {  //已经到达最大速度
         height_gained = 0.5f * TAKEOFF_ACCEL * sq(time_to_max_speed) + takeoff_minspeed * time_to_max_speed +
                         (time_elapsed - time_to_max_speed) * max_speed;
     }
@@ -115,22 +115,22 @@ void Copter::Mode::_TakeOff::get_climb_rates(float& pilot_climb_rate,
     takeoff_climb_rate = speed;
 
     // if pilot's commands descent
-    if (pilot_climb_rate < 0.0f) {
+    if (pilot_climb_rate < 0.0f) {//爬升过程，操纵下降
         // if overall climb rate is still positive, move to take-off climb rate
-        if (takeoff_climb_rate + pilot_climb_rate > 0.0f) {
+        if (takeoff_climb_rate + pilot_climb_rate > 0.0f) {//相当于减小爬升速度，还是在爬升
             takeoff_climb_rate = takeoff_climb_rate + pilot_climb_rate;
             pilot_climb_rate = 0.0f;
-        } else {
+        } else {//表现出来是下降
             // if overall is negative, move to pilot climb rate
             pilot_climb_rate = pilot_climb_rate + takeoff_climb_rate;
             takeoff_climb_rate = 0.0f;
         }
-    } else { // pilot commands climb
+    } else { // pilot commands climb爬升过程操纵上升
         // pilot climb rate is zero until it surpasses the take-off climb rate
         if (pilot_climb_rate > takeoff_climb_rate) {
-            pilot_climb_rate = pilot_climb_rate - takeoff_climb_rate;
+            pilot_climb_rate = pilot_climb_rate - takeoff_climb_rate;//相减是因为后面代码两个都计算
         } else {
-            pilot_climb_rate = 0.0f;
+            pilot_climb_rate = 0.0f; //现在的速度已经大于期望速度
         }
     }
 }

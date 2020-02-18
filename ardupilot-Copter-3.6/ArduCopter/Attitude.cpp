@@ -118,7 +118,7 @@ float Copter::get_pilot_desired_climb_rate(float throttle_control)
         return 0.0f;
     }
 
-#if TOY_MODE_ENABLED == ENABLED
+#if TOY_MODE_ENABLED == ENABLED   //是不是玩具模式，就是油门会慢慢减小。
     if (g2.toy_mode.enabled()) {
         // allow throttle to be reduced after throttle arming and for
         // slower descent close to the ground
@@ -138,7 +138,7 @@ float Copter::get_pilot_desired_climb_rate(float throttle_control)
     g.throttle_deadzone = constrain_int16(g.throttle_deadzone, 0, 400);
 
     // check throttle is above, below or in the deadband
-    if (throttle_control < deadband_bottom) {
+    if (throttle_control < deadband_bottom) {  //操纵下降
         // below the deadband
         desired_rate = get_pilot_speed_dn() * (throttle_control-deadband_bottom) / deadband_bottom;
     }else if (throttle_control > deadband_top) {

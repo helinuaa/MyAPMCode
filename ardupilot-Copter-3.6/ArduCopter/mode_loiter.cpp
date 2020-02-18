@@ -76,7 +76,7 @@ void Copter::ModeLoiter::precision_loiter_xy()
 // should be called at 100hz or more
 void Copter::ModeLoiter::run()
 {
-    LoiterModeState loiter_state;
+    LoiterModeState loiter_state;   //状态结构体
 
     float target_roll, target_pitch;
     float target_yaw_rate = 0.0f;
@@ -90,7 +90,7 @@ void Copter::ModeLoiter::run()
     // process pilot inputs unless we are in radio failsafe
     if (!copter.failsafe.radio) {  //遥控器信号有效 
         // apply SIMPLE mode transform to pilot inputs
-        update_simple_mode();   //将操纵量先转到北东地坐标系再转到
+        update_simple_mode();   //将操纵量先转到北东地坐标系再转到，如果不是无头模式就直接返回
 
         // convert pilot input to lean angles操纵量到目标角度，并且限幅
         get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max());
@@ -106,20 +106,20 @@ void Copter::ModeLoiter::run()
         target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
     } else {
         // clear out pilot desired acceleration in case radio failsafe event occurs and we do not switch to RTL for some reason
-        loiter_nav->clear_pilot_desired_acceleration();
+        loiter_nav->clear_pilot_desired_acceleration();  //没有信号的时候，期望加速度设置为0，即水平方向保持。
     }
 
     // relax loiter target if we might be landed
     if (ap.land_complete_maybe) {
-        loiter_nav->soften_for_landing();
+        loiter_nav->soften_for_landing();  //将当前位置设置为目标位置，为降落准备
     }
 
     // Loiter State Machine Determination
-    if (!motors->armed() || !motors->get_interlock()) {
+    if (!motors->armed() || !motors->get_interlock()) {   //电机上锁，两个开关
         loiter_state = Loiter_MotorStopped;
     } else if (takeoff.running() || takeoff.triggered(target_climb_rate)) {
         loiter_state = Loiter_Takeoff;
-    } else if (!ap.auto_armed || ap.land_complete) {
+    } else if (!ap.auto_armed || ap.land_complete) {   //ap.auto_armed是油门标志量
         loiter_state = Loiter_Landed;
     } else {
         loiter_state = Loiter_Flying;
@@ -130,7 +130,7 @@ void Copter::ModeLoiter::run()
 
     case Loiter_MotorStopped:
 
-        motors->set_desired_spool_state(AP_Motors::DESIRED_SHUT_DOWN);
+        motors->set_desired_spool_state(AP_Motors::DESIRED_SHUT_DOWN); //设置电机状态为DESIRED_SHUT_DOWN
 #if FRAME_CONFIG == HELI_FRAME  //直升机
         if (!motors->get_interlock() && ap.land_complete) {
             loiter_nav->init_target();
@@ -161,7 +161,7 @@ void Copter::ModeLoiter::run()
 
         // initiate take-off
         if (!takeoff.running()) {
-            takeoff.start(constrain_float(g.pilot_takeoff_alt,0.0f,1000.0f));
+            takeoff.start(constrain_float(g.pilot_takeoff_alt,0.0f,1000.0f));//高度范围是0-10米
             // indicate we are taking off
             set_land_complete(false);
             // clear i term when we're taking off
@@ -171,7 +171,7 @@ void Copter::ModeLoiter::run()
         // get takeoff adjusted pilot and takeoff climb rates
         takeoff.get_climb_rates(target_climb_rate, takeoff_climb_rate);
 
-        // get avoidance adjusted climb rate
+        // get avoidance adjusted climb rate避障用的
         target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
 
         // run loiter controller
@@ -182,7 +182,7 @@ void Copter::ModeLoiter::run()
 
         // update altitude target and call position controller
         pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
-        pos_control->add_takeoff_climb_rate(takeoff_climb_rate, G_Dt);
+        pos_control->add_takeoff_climb_rate(takeoff_climb_rate, G_Dt); //爬升模式才有
         pos_control->update_z_controller();
         break;
 
@@ -224,7 +224,7 @@ void Copter::ModeLoiter::run()
         // get avoidance adjusted climb rate
         target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
 
-        // update altitude target and call position controller
+        // update altitude target and call position controller计算垂向期望加速度，并修正垂向目标位置
         pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
         pos_control->update_z_controller();
         break;

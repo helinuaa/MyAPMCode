@@ -83,7 +83,7 @@
   and the maximum time they are expected to take (in microseconds)
  */
 const AP_Scheduler::Task Copter::scheduler_tasks[] = {
-    SCHED_TASK(rc_loop,              100,    130),
+    SCHED_TASK(rc_loop,              100,    130),   //读取遥控器数据
     SCHED_TASK(throttle_loop,         50,     75),
     SCHED_TASK(update_GPS,            50,    200),
 #if OPTFLOW == ENABLED
@@ -91,11 +91,11 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #endif
     SCHED_TASK(update_batt_compass,   10,    120),
     SCHED_TASK(read_aux_switches,     10,     50),
-    SCHED_TASK(arm_motors_check,      10,     50),
+    SCHED_TASK(arm_motors_check,      10,     50),  //操纵上锁更新
 #if TOY_MODE_ENABLED == ENABLED
     SCHED_TASK_CLASS(ToyMode,              &copter.g2.toy_mode,         update,          10,  50),
 #endif
-    SCHED_TASK(auto_disarm_check,     10,     50),
+    SCHED_TASK(auto_disarm_check,     10,     50),//操纵上锁更新
     SCHED_TASK(auto_trim,             10,     75),
 #if RANGEFINDER_ENABLED == ENABLED
     SCHED_TASK(read_rangefinder,      20,    100),
@@ -109,9 +109,9 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if VISUAL_ODOMETRY_ENABLED == ENABLED
     SCHED_TASK(update_visual_odom,   400,     50),
 #endif
-    SCHED_TASK(update_altitude,       10,    100),
+    SCHED_TASK(update_altitude,       10,    100), //高度更新
     SCHED_TASK(run_nav_updates,       50,    100),
-    SCHED_TASK(update_throttle_hover,100,     90),
+    SCHED_TASK(update_throttle_hover,100,     90),  //悬停油门更新
 #if MODE_SMARTRTL_ENABLED == ENABLED
     SCHED_TASK_CLASS(Copter::ModeSmartRTL, &copter.mode_smartrtl,       save_position,    3, 100),
 #endif
@@ -133,8 +133,8 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(gpsglitch_check,       10,     50),
     SCHED_TASK(landinggear_update,    10,     75),
     SCHED_TASK(lost_vehicle_check,    10,     50),
-    SCHED_TASK(gcs_check_input,      400,    180),
-    SCHED_TASK(gcs_send_heartbeat,     1,    110),
+    SCHED_TASK(gcs_check_input,      400,    180),  //检车地面站输入
+    SCHED_TASK(gcs_send_heartbeat,     1,    110),//向地面站发送心跳包
     SCHED_TASK(gcs_send_deferred,     50,    550),
     SCHED_TASK(gcs_data_stream_send,  50,    550),
 #if MOUNT == ENABLED
@@ -197,7 +197,7 @@ constexpr int8_t Copter::_failsafe_priorities[7];
 void Copter::setup()
 {
     // Load the default values of variables listed in var_info[]s
-    AP_Param::setup_sketch_defaults();
+    AP_Param::setup_sketch_defaults();  //加载参数
 
     // setup storage layout for copter
     StorageManager::set_layout_copter();
@@ -277,10 +277,10 @@ void Copter::rc_loop()
 void Copter::throttle_loop()
 {
     // update throttle_low_comp value (controls priority of throttle vs attitude control)
-    update_throttle_thr_mix();
+    update_throttle_thr_mix(); //混合系数更新
 
     // check auto_armed status
-    update_auto_armed();
+    update_auto_armed();  //解锁状态更新
 
 #if FRAME_CONFIG == HELI_FRAME
     // update rotor speed
@@ -291,7 +291,7 @@ void Copter::throttle_loop()
 #endif
 
     // compensate for ground effect (if enabled)
-    update_ground_effect_detector();
+    update_ground_effect_detector();  //地效补偿
 }
 
 // update_batt_compass - read battery and compass
